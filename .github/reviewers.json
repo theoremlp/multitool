@@ -1,0 +1,15 @@
+{
+  "teams": {},
+  "reviewers": {},
+  "overrides": [
+    {
+      "description": "Auto-approve automated PRs",
+      "onlyModifiedByUsers": ["thm-automation[bot]", "renovate-thm[bot]"],
+      "onlyModifiedFileRegExs": [
+        "^.github/workflows/.*",
+        "^Cargo.toml$",
+        "^Cargo.lock$"
+      ]
+    }
+  ]
+}
