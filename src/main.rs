@@ -138,7 +138,7 @@ fn update_github_release(
     org: &str,
     repo: &str,
     version: &str,
-    _path: &str,
+    path: &str,
 ) -> Result<BinaryUnion, Box<dyn Error>> {
     let key = format!("https://api.github.com/repos/{org}/{repo}/releases/latest");
     let raw = gh_latest_releases.entry(key.clone()).or_insert_with(|| {
@@ -151,18 +151,21 @@ fn update_github_release(
     });
 
     let response: Value = serde_json::from_str(raw)?;
-    let latest = response["tag_name"]
+    let latest_tag = response["tag_name"]
         .as_str()
         .unwrap_or_else(|| panic!("Failed to find tag_name in response:\n===\n{raw}\n===\n"));
 
-    if version == latest {
+    if version == latest_tag {
         return Ok(binary.clone());
     }
 
     let version = version.strip_prefix('v').unwrap_or(version);
-    let latest = latest.strip_prefix('v').unwrap_or(latest);
+    let latest = latest_tag.strip_prefix('v').unwrap_or(latest_tag);
 
-    let url = binary.url().replace(version, latest);
+    let url = format!(
+        "https://github.com/{org}/{repo}/releases/download/{latest_tag}/{0}",
+        path.replace(version, latest)
+    );
     // TODO(mark): check that the new url is in .assets[].browser_download_url
 
     let sha256 = compute_sha256(client, &url)?;
@@ -213,39 +216,42 @@ fn update_lockfile(lockfile: &std::path::Path) {
     // basic cache of latest release lookups
     let mut gh_latest_releases: HashMap<String, String> = HashMap::new();
 
-    let mut new_tools: BTreeMap<String, Binary> = BTreeMap::new();
-    for (tool_name, binary) in tools.into_iter() {
-        let mut new_binaries: Vec<BinaryUnion> = Vec::new();
-        for binary in binary.binaries.into_iter() {
-            let new_binary = match github_release_pattern.captures(binary.url()) {
-                Some(cap) => {
-                    let (_, [org, repo, version, path]) = cap.extract();
-                    update_github_release(
-                        &client,
-                        &mut gh_latest_releases,
-                        &binary,
-                        org,
-                        repo,
-                        version,
-                        path,
-                    )
-                    .expect("Error while updating GitHub release")
-                }
-                None => binary.clone(),
-            };
-            new_binaries.push(new_binary)
-        }
+    let tools: BTreeMap<String, Binary> = tools
+        .into_iter()
+        .map(|(tool, binary)| {
+            let mut binaries: Vec<BinaryUnion> = binary
+                .binaries
+                .into_iter()
+                .map(
+                    |binary| match github_release_pattern.captures(binary.url()) {
+                        Some(cap) => {
+                            let (_, [org, repo, version, path]) = cap.extract();
+                            update_github_release(
+                                &client,
+                                &mut gh_latest_releases,
+                                &binary,
+                                org,
+                                repo,
+                                version,
+                                path,
+                            )
+                            .map_err(|e| {
+                                println!("Encountered error while attempting to update {tool}: {e}")
+                            })
+                            .unwrap_or(binary)
+                        }
+                        None => binary,
+                    },
+                )
+                .collect();
 
-        new_binaries.sort_by_key(|v| v.sort_key());
-        new_tools.insert(
-            tool_name.clone(),
-            Binary {
-                binaries: new_binaries,
-            },
-        );
-    }
+            binaries.sort_by_key(|v| v.sort_key());
 
-    let contents = serde_json::to_string_pretty(&new_tools).unwrap();
+            (tool, Binary { binaries })
+        })
+        .collect();
+
+    let contents = serde_json::to_string_pretty(&tools).unwrap();
     fs::write(lockfile, contents + "\n").expect("Error updating lockfile")
 }
 
