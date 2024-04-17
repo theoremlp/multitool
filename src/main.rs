@@ -51,10 +51,10 @@ struct FileBinary {
 #[derive(Clone, Serialize, Deserialize)]
 struct ArchiveBinary {
     url: String,
+    file: String,
     sha256: String,
     os: SupportedOs,
     cpu: SupportedCpu,
-    file: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     headers: Option<HashMap<String, String>>,
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
@@ -64,10 +64,10 @@ struct ArchiveBinary {
 #[derive(Clone, Serialize, Deserialize)]
 struct PkgBinary {
     url: String,
+    file: String,
     sha256: String,
     os: SupportedOs,
     cpu: SupportedCpu,
-    file: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     headers: Option<HashMap<String, String>>,
 }
@@ -246,7 +246,7 @@ fn update_lockfile(lockfile: &std::path::Path) {
     }
 
     let contents = serde_json::to_string_pretty(&new_tools).unwrap();
-    fs::write(lockfile, contents).expect("Error updating lockfile")
+    fs::write(lockfile, contents + "\n").expect("Error updating lockfile")
 }
 
 fn main() {
