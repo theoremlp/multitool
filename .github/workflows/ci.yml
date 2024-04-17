@@ -14,5 +14,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: Build
         run: cargo build --verbose
+      - name: Lint
+        run: cargo clippy --frozen --all-features -- -Dwarnings
       - name: Test
         run: cargo test --verbose

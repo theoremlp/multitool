@@ -252,7 +252,8 @@ fn update_lockfile(lockfile: &std::path::Path) {
 fn main() {
     let cli = Cli::parse();
     let lockfile = cli
-        .lockfile.as_deref()
+        .lockfile
+        .as_deref()
         .unwrap_or_else(|| std::path::Path::new("./multitool.lock.json"));
 
     if !lockfile.exists() {
