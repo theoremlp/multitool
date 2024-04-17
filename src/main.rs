@@ -150,7 +150,7 @@ fn update_github_release(
             .unwrap()
     });
 
-    let response: Value = serde_json::from_str(&raw)?;
+    let response: Value = serde_json::from_str(raw)?;
     let latest = response["tag_name"]
         .as_str()
         .unwrap_or_else(|| panic!("Failed to find tag_name in response:\n===\n{raw}\n===\n"));
@@ -159,8 +159,8 @@ fn update_github_release(
         return Ok(binary.clone());
     }
 
-    let version = version.strip_prefix("v").unwrap_or(version);
-    let latest = latest.strip_prefix("v").unwrap_or(latest);
+    let version = version.strip_prefix('v').unwrap_or(version);
+    let latest = latest.strip_prefix('v').unwrap_or(latest);
 
     let url = binary.url().replace(version, latest);
     // TODO(mark): check that the new url is in .assets[].browser_download_url
@@ -252,9 +252,7 @@ fn update_lockfile(lockfile: &std::path::Path) {
 fn main() {
     let cli = Cli::parse();
     let lockfile = cli
-        .lockfile
-        .as_ref()
-        .map(|p| p.as_path())
+        .lockfile.as_deref()
         .unwrap_or_else(|| std::path::Path::new("./multitool.lock.json"));
 
     if !lockfile.exists() {
