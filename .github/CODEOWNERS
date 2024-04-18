@@ -1,3 +1,4 @@
 * @theoremlp/eng
 
+.github/workflows/*.yml @theoremlp/eng @reviewbot-theorem
 Cargo.* @theoremlp/eng @reviewbot-theorem
