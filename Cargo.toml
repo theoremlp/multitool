@@ -5,9 +5,13 @@ edition = "2021"
 repository = "https://github.com/theoremlp/multitool"
 
 [dependencies]
+reqwest = { version = "0.12.3", default-features = false, features = [
+    "blocking",
+    "rustls-tls",
+    "rustls-tls-native-roots",
+] }
 clap = { version = "4.5.4", features = ["derive"] }
 regex = "1.10.4"
-reqwest = { version = "0.12.4", features = ["blocking"] }
 serde = { version = "1.0.198", features = ["derive"] }
 serde_json = "1.0.116"
 sha256 = "1.5.0"
@@ -26,6 +30,10 @@ ci = ["github"]
 # The installers to generate for each app
 installers = []
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu"]
+targets = [
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+]
 # Publish jobs to run in CI
 pr-run-mode = "plan"
