@@ -17,6 +17,6 @@ jobs:
       - name: Build
         run: cargo build --verbose
       - name: Lint
-        run: cargo clippy --frozen --all-features -- -Dwarnings
+        run: cargo clippy --no-deps --frozen --all-features -- -Dwarnings
       - name: Test
         run: cargo test --verbose
