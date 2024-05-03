@@ -5,6 +5,7 @@ use serde_json::Value;
 use std::{
     collections::{BTreeMap, HashMap},
     error::Error,
+    fmt::Display,
     fs,
 };
 
@@ -85,21 +86,15 @@ struct Binary {
     binaries: Vec<BinaryUnion>,
 }
 
-impl ToString for SupportedCpu {
-    fn to_string(&self) -> String {
-        match &self {
-            SupportedCpu::Arm64 => "arm64".to_string(),
-            SupportedCpu::X86_64 => "x86_64".to_string(),
-        }
+impl Display for SupportedCpu {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
     }
 }
 
-impl ToString for SupportedOs {
-    fn to_string(&self) -> String {
-        match &self {
-            SupportedOs::Linux => "linux".to_string(),
-            SupportedOs::MacOS => "macos".to_string(),
-        }
+impl Display for SupportedOs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
     }
 }
 
