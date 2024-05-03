@@ -120,9 +120,9 @@ impl Common for BinaryUnion {
 
     fn sort_key(&self) -> String {
         match &self {
-            BinaryUnion::File(bin) => format!("{:?}_{:?}", bin.os, bin.cpu),
-            BinaryUnion::Archive(bin) => format!("{:?}_{:?}", bin.os, bin.cpu),
-            BinaryUnion::Pkg(bin) => format!("{:?}_{:?}", bin.os, bin.cpu),
+            BinaryUnion::File(bin) => format!("{}_{}", bin.os, bin.cpu),
+            BinaryUnion::Archive(bin) => format!("{}_{}", bin.os, bin.cpu),
+            BinaryUnion::Pkg(bin) => format!("{}_{}", bin.os, bin.cpu),
         }
     }
 }
