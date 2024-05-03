@@ -18,5 +18,7 @@ jobs:
         run: cargo build --verbose
       - name: Lint
         run: cargo clippy --no-deps --frozen --all-features -- -Dwarnings
+      - name: Check Formatting
+        run: cargo fmt --check
       - name: Test
         run: cargo test --verbose
