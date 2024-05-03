@@ -88,13 +88,19 @@ struct Binary {
 
 impl Display for SupportedCpu {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        match &self {
+            SupportedCpu::Arm64 => write!(f, "arm64"),
+            SupportedCpu::X86_64 => write!(f, "x86_64"),
+        }
     }
 }
 
 impl Display for SupportedOs {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        match &self {
+            SupportedOs::Linux => write!(f, "linux"),
+            SupportedOs::MacOS => write!(f, "macos"),
+        }
     }
 }
 
