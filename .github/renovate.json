@@ -5,5 +5,8 @@
   "schedule": ["every weekday after 9am before 5pm"],
   "branchConcurrentLimit": 10,
   "labels": ["automerge"],
-  "dependencyDashboard": true
+  "dependencyDashboard": true,
+  "cargo": {
+    "fileMatch": ["^Cargo\\.(lock|toml)$"]
+  }
 }
