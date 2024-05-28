@@ -1,13 +1,28 @@
 use clap::{Parser, Subcommand};
+use lockfile::{ArchiveBinary, Binary, FileBinary, Lockfile, PkgBinary, ToolDefinition};
+use once_cell::sync::Lazy as LazyLock;
 use regex::Regex;
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
     collections::{BTreeMap, HashMap},
     error::Error,
-    fmt::Display,
     fs,
 };
+
+mod lockfile;
+
+static GITHUB_RELEASE_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?x)
+        https://github\.com/
+        (?P<org>[A-Za-z0-9_-]+)/
+        (?P<repo>[A-Za-z0-9_-]+)/
+        releases/download/
+        (?P<version>v?[^/]+)/
+        (?P<path>.+)",
+    )
+    .unwrap()
+});
 
 #[derive(Parser)]
 struct Cli {
@@ -25,122 +40,44 @@ enum Commands {
     Update,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum SupportedOs {
-    Linux,
-    MacOS,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum SupportedCpu {
-    Arm64,
-    X86_64,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-struct FileBinary {
-    url: String,
-    sha256: String,
-    os: SupportedOs,
-    cpu: SupportedCpu,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    headers: Option<HashMap<String, String>>,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-struct ArchiveBinary {
-    url: String,
-    file: String,
-    sha256: String,
-    os: SupportedOs,
-    cpu: SupportedCpu,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    headers: Option<HashMap<String, String>>,
-    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
-    type_: Option<String>, // TODO(mark): we should probably make this an enum
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-struct PkgBinary {
-    url: String,
-    file: String,
-    sha256: String,
-    os: SupportedOs,
-    cpu: SupportedCpu,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    headers: Option<HashMap<String, String>>,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "lowercase")]
-enum BinaryUnion {
-    File(FileBinary),
-    Archive(ArchiveBinary),
-    Pkg(PkgBinary),
-}
-
-#[derive(Serialize, Deserialize)]
-struct Binary {
-    binaries: Vec<BinaryUnion>,
-}
-
-impl Display for SupportedCpu {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self {
-            SupportedCpu::Arm64 => write!(f, "arm64"),
-            SupportedCpu::X86_64 => write!(f, "x86_64"),
-        }
-    }
-}
-
-impl Display for SupportedOs {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self {
-            SupportedOs::Linux => write!(f, "linux"),
-            SupportedOs::MacOS => write!(f, "macos"),
-        }
-    }
-}
-
 trait Common {
     fn url(&self) -> &str;
     fn sort_key(&self) -> String;
 }
 
-impl Common for BinaryUnion {
+impl Common for Binary {
     fn url(&self) -> &str {
         match &self {
-            BinaryUnion::File(file) => &file.url,
-            BinaryUnion::Archive(archive) => &archive.url,
-            BinaryUnion::Pkg(pkg) => &pkg.url,
+            Binary::File(file) => &file.url,
+            Binary::Archive(archive) => &archive.url,
+            Binary::Pkg(pkg) => &pkg.url,
         }
     }
 
     fn sort_key(&self) -> String {
         match &self {
-            BinaryUnion::File(bin) => format!("{}_{}", bin.os, bin.cpu),
-            BinaryUnion::Archive(bin) => format!("{}_{}", bin.os, bin.cpu),
-            BinaryUnion::Pkg(bin) => format!("{}_{}", bin.os, bin.cpu),
+            Binary::File(bin) => format!("{}_{}", bin.os, bin.cpu),
+            Binary::Archive(bin) => format!("{}_{}", bin.os, bin.cpu),
+            Binary::Pkg(bin) => format!("{}_{}", bin.os, bin.cpu),
         }
     }
 }
 
 fn compute_sha256(client: &reqwest::blocking::Client, url: &str) -> Result<String, Box<dyn Error>> {
-    let bytes = client.get(url).send()?.bytes()?;
+    let response = client.get(url).send()?.error_for_status()?;
+    let bytes = response.bytes()?;
     Ok(sha256::digest(bytes.to_vec()))
 }
 
 fn update_github_release(
     client: &reqwest::blocking::Client,
     gh_latest_releases: &mut HashMap<String, String>,
-    binary: &BinaryUnion,
+    binary: &Binary,
     org: &str,
     repo: &str,
     version: &str,
     path: &str,
-) -> Result<BinaryUnion, Box<dyn Error>> {
+) -> Result<Binary, Box<dyn Error>> {
     let key = format!("https://api.github.com/repos/{org}/{repo}/releases/latest");
     let raw = gh_latest_releases.entry(key.clone()).or_insert_with(|| {
         client
@@ -171,15 +108,17 @@ fn update_github_release(
 
     let sha256 = compute_sha256(client, &url)?;
 
+    println!("Updating {org}/{repo} from {version} to {latest}");
+
     Ok(match binary {
-        BinaryUnion::File(bin) => BinaryUnion::File(FileBinary {
+        Binary::File(bin) => Binary::File(FileBinary {
             url,
             cpu: bin.cpu.clone(),
             os: bin.os.clone(),
             sha256,
             headers: bin.headers.clone(),
         }),
-        BinaryUnion::Archive(bin) => BinaryUnion::Archive(ArchiveBinary {
+        Binary::Archive(bin) => Binary::Archive(ArchiveBinary {
             url,
             file: bin.file.replace(version, latest),
             cpu: bin.cpu.clone(),
@@ -188,7 +127,7 @@ fn update_github_release(
             headers: bin.headers.clone(),
             type_: bin.type_.clone(),
         }),
-        BinaryUnion::Pkg(bin) => BinaryUnion::Pkg(PkgBinary {
+        Binary::Pkg(bin) => Binary::Pkg(PkgBinary {
             url,
             file: bin.file.replace(version, latest),
             cpu: bin.cpu.clone(),
@@ -199,15 +138,11 @@ fn update_github_release(
     })
 }
 
-fn update_lockfile(lockfile: &std::path::Path) {
-    let contents = fs::read_to_string(lockfile).expect("Unable to load lockfile");
+fn update_lockfile(path: &std::path::Path) {
+    let contents = fs::read_to_string(path).expect("Unable to load lockfile");
 
-    let tools: HashMap<String, Binary> =
+    let lockfile: Lockfile =
         serde_json::from_str(&contents).expect("Unable to deserialize lockfile");
-
-    let github_release_pattern = Regex::new(
-        r"https://github\.com/(?P<org>[A-Za-z0-9_-]+)/(?P<repo>[A-Za-z0-9_-]+)/releases/download/(?P<version>v?[^/]+)/(?P<path>.+)"
-    ).unwrap();
 
     let client = reqwest::blocking::Client::builder()
         .user_agent("multitool")
@@ -217,14 +152,15 @@ fn update_lockfile(lockfile: &std::path::Path) {
     // basic cache of latest release lookups
     let mut gh_latest_releases: HashMap<String, String> = HashMap::new();
 
-    let tools: BTreeMap<String, Binary> = tools
+    let tools: BTreeMap<String, ToolDefinition> = lockfile
+        .tools
         .into_iter()
         .map(|(tool, binary)| {
-            let mut binaries: Vec<BinaryUnion> = binary
+            let mut binaries: Vec<Binary> = binary
                 .binaries
                 .into_iter()
                 .map(
-                    |binary| match github_release_pattern.captures(binary.url()) {
+                    |binary| match GITHUB_RELEASE_PATTERN.captures(binary.url()) {
                         Some(cap) => {
                             let (_, [org, repo, version, path]) = cap.extract();
                             update_github_release(
@@ -248,12 +184,17 @@ fn update_lockfile(lockfile: &std::path::Path) {
 
             binaries.sort_by_key(|v| v.sort_key());
 
-            (tool, Binary { binaries })
+            (tool, ToolDefinition { binaries })
         })
         .collect();
 
-    let contents = serde_json::to_string_pretty(&tools).unwrap();
-    fs::write(lockfile, contents + "\n").expect("Error updating lockfile")
+    let lockfile = Lockfile {
+        schema: lockfile.schema,
+        tools,
+    };
+
+    let contents = serde_json::to_string_pretty(&lockfile).unwrap();
+    fs::write(path, contents + "\n").expect("Error updating lockfile")
 }
 
 fn main() {
