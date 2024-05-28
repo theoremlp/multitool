@@ -4,6 +4,9 @@ use std::{
     fmt::Display,
 };
 
+pub const SCHEMA: &str =
+    "https://raw.githubusercontent.com/theoremlp/rules_multitool/main/lockfile.schema.json";
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SupportedOs {
@@ -84,8 +87,7 @@ impl Display for SupportedOs {
 }
 
 fn schema() -> String {
-    "https://raw.githubusercontent.com/theoremlp/rules_multitool/main/lockfile.schema.json"
-        .to_owned()
+    SCHEMA.to_owned()
 }
 
 #[derive(Serialize, Deserialize)]

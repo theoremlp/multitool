@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use lockfile::{ArchiveBinary, Binary, FileBinary, Lockfile, PkgBinary, ToolDefinition};
+use lockfile::{ArchiveBinary, Binary, FileBinary, Lockfile, PkgBinary, ToolDefinition, SCHEMA};
 use once_cell::sync::Lazy as LazyLock;
 use regex::Regex;
 use serde_json::Value;
@@ -63,6 +63,27 @@ impl Common for Binary {
     }
 }
 
+struct GitHubRelease<'a> {
+    org: &'a str,
+    repo: &'a str,
+    version: &'a str,
+    path: &'a str,
+}
+
+impl GitHubRelease<'_> {
+    fn from(url: &str) -> Option<GitHubRelease> {
+        GITHUB_RELEASE_PATTERN.captures(url).map(|capture| {
+            let (_, [org, repo, version, path]) = capture.extract();
+            GitHubRelease {
+                org,
+                repo,
+                version,
+                path,
+            }
+        })
+    }
+}
+
 fn compute_sha256(client: &reqwest::blocking::Client, url: &str) -> Result<String, Box<dyn Error>> {
     let response = client.get(url).send()?.error_for_status()?;
     let bytes = response.bytes()?;
@@ -72,12 +93,13 @@ fn compute_sha256(client: &reqwest::blocking::Client, url: &str) -> Result<Strin
 fn update_github_release(
     client: &reqwest::blocking::Client,
     gh_latest_releases: &mut HashMap<String, String>,
+    tool: &str,
     binary: &Binary,
-    org: &str,
-    repo: &str,
-    version: &str,
-    path: &str,
+    release: &GitHubRelease,
 ) -> Result<Binary, Box<dyn Error>> {
+    let org = release.org;
+    let repo = release.repo;
+
     let key = format!("https://api.github.com/repos/{org}/{repo}/releases/latest");
     let raw = gh_latest_releases.entry(key.clone()).or_insert_with(|| {
         client
@@ -93,48 +115,64 @@ fn update_github_release(
         .as_str()
         .unwrap_or_else(|| panic!("Failed to find tag_name in response:\n===\n{raw}\n===\n"));
 
-    if version == latest_tag {
+    if release.version == latest_tag {
         return Ok(binary.clone());
     }
 
-    let version = version.strip_prefix('v').unwrap_or(version);
+    let version = release.version.strip_prefix('v').unwrap_or(release.version);
     let latest = latest_tag.strip_prefix('v').unwrap_or(latest_tag);
 
     let url = format!(
         "https://github.com/{org}/{repo}/releases/download/{latest_tag}/{0}",
-        path.replace(version, latest)
+        release.path.replace(version, latest)
     );
     // TODO(mark): check that the new url is in .assets[].browser_download_url
 
     let sha256 = compute_sha256(client, &url)?;
 
-    println!("Updating {org}/{repo} from {version} to {latest}");
-
     Ok(match binary {
-        Binary::File(bin) => Binary::File(FileBinary {
-            url,
-            cpu: bin.cpu.clone(),
-            os: bin.os.clone(),
-            sha256,
-            headers: bin.headers.clone(),
-        }),
-        Binary::Archive(bin) => Binary::Archive(ArchiveBinary {
-            url,
-            file: bin.file.replace(version, latest),
-            cpu: bin.cpu.clone(),
-            os: bin.os.clone(),
-            sha256,
-            headers: bin.headers.clone(),
-            type_: bin.type_.clone(),
-        }),
-        Binary::Pkg(bin) => Binary::Pkg(PkgBinary {
-            url,
-            file: bin.file.replace(version, latest),
-            cpu: bin.cpu.clone(),
-            os: bin.os.clone(),
-            sha256,
-            headers: bin.headers.clone(),
-        }),
+        Binary::File(bin) => {
+            println!(
+                "Updating {tool} ({}/{}) from {version} to {latest}",
+                bin.os, bin.cpu
+            );
+            Binary::File(FileBinary {
+                url,
+                cpu: bin.cpu.clone(),
+                os: bin.os.clone(),
+                sha256,
+                headers: bin.headers.clone(),
+            })
+        }
+        Binary::Archive(bin) => {
+            println!(
+                "Updating {tool} ({}/{}) from {version} to {latest}",
+                bin.os, bin.cpu
+            );
+            Binary::Archive(ArchiveBinary {
+                url,
+                file: bin.file.replace(version, latest),
+                cpu: bin.cpu.clone(),
+                os: bin.os.clone(),
+                sha256,
+                headers: bin.headers.clone(),
+                type_: bin.type_.clone(),
+            })
+        }
+        Binary::Pkg(bin) => {
+            println!(
+                "Updating {tool} ({}/{}) from {version} to {latest}",
+                bin.os, bin.cpu
+            );
+            Binary::Pkg(PkgBinary {
+                url,
+                file: bin.file.replace(version, latest),
+                cpu: bin.cpu.clone(),
+                os: bin.os.clone(),
+                sha256,
+                headers: bin.headers.clone(),
+            })
+        }
     })
 }
 
@@ -143,6 +181,10 @@ fn update_lockfile(path: &std::path::Path) {
 
     let lockfile: Lockfile =
         serde_json::from_str(&contents).expect("Unable to deserialize lockfile");
+
+    if lockfile.schema != SCHEMA {
+        panic!("Unsupported lockfile schema {}", lockfile.schema)
+    }
 
     let client = reqwest::blocking::Client::builder()
         .user_agent("multitool")
@@ -159,27 +201,20 @@ fn update_lockfile(path: &std::path::Path) {
             let mut binaries: Vec<Binary> = binary
                 .binaries
                 .into_iter()
-                .map(
-                    |binary| match GITHUB_RELEASE_PATTERN.captures(binary.url()) {
-                        Some(cap) => {
-                            let (_, [org, repo, version, path]) = cap.extract();
-                            update_github_release(
-                                &client,
-                                &mut gh_latest_releases,
-                                &binary,
-                                org,
-                                repo,
-                                version,
-                                path,
-                            )
-                            .map_err(|e| {
-                                println!("Encountered error while attempting to update {tool}: {e}")
-                            })
-                            .unwrap_or(binary)
-                        }
-                        None => binary,
-                    },
-                )
+                .map(|binary| match GitHubRelease::from(binary.url()) {
+                    Some(release) => update_github_release(
+                        &client,
+                        &mut gh_latest_releases,
+                        &tool,
+                        &binary,
+                        &release,
+                    )
+                    .map_err(|e| {
+                        println!("Encountered error while attempting to update {tool}: {e}")
+                    })
+                    .unwrap_or(binary),
+                    None => binary,
+                })
                 .collect();
 
             binaries.sort_by_key(|v| v.sort_key());
