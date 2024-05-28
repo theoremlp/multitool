@@ -528,6 +528,7 @@ name = "multitool"
 version = "0.2.1"
 dependencies = [
  "clap",
+ "once_cell",
  "regex",
  "reqwest",
  "serde",
