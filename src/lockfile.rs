@@ -141,7 +141,8 @@ mod tests {
         }"#).unwrap();
         assert_eq!(
             lockfile.schema,
-            Some("https://raw.githubusercontent.com/theoremlp/rules_multitool/main/lockfile.schema.json".to_owned())
+            "https://raw.githubusercontent.com/theoremlp/rules_multitool/main/lockfile.schema.json"
+                .to_owned()
         );
         assert_eq!(lockfile.tools.len(), 1);
         assert_eq!(lockfile.tools["tool-name"].binaries.len(), 1);
