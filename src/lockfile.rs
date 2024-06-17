@@ -12,6 +12,7 @@ pub const SCHEMA: &str =
 pub enum SupportedOs {
     Linux,
     MacOS,
+    Windows,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -82,6 +83,7 @@ impl Display for SupportedOs {
         match &self {
             SupportedOs::Linux => write!(f, "linux"),
             SupportedOs::MacOS => write!(f, "macos"),
+            SupportedOs::Windows => write!(f, "windows"),
         }
     }
 }
