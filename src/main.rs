@@ -142,6 +142,7 @@ fn update_github_release(
                 os: bin.os.clone(),
                 sha256,
                 headers: bin.headers.clone(),
+                auth_patterns: bin.auth_patterns.clone(),
             })
         }
         Binary::Archive(bin) => {
@@ -157,6 +158,7 @@ fn update_github_release(
                 sha256,
                 headers: bin.headers.clone(),
                 type_: bin.type_.clone(),
+                auth_patterns: bin.auth_patterns.clone(),
             })
         }
         Binary::Pkg(bin) => {
@@ -171,6 +173,7 @@ fn update_github_release(
                 os: bin.os.clone(),
                 sha256,
                 headers: bin.headers.clone(),
+                auth_patterns: bin.auth_patterns.clone(),
             })
         }
     })
