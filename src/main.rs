@@ -1,12 +1,12 @@
 use clap::{Parser, Subcommand};
 use lockfile::{ArchiveBinary, Binary, FileBinary, Lockfile, PkgBinary, ToolDefinition, SCHEMA};
-use once_cell::sync::Lazy as LazyLock;
 use regex::Regex;
 use serde_json::Value;
 use std::{
     collections::{BTreeMap, HashMap},
     error::Error,
     fs,
+    sync::LazyLock,
 };
 
 mod lockfile;
