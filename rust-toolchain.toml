@@ -1,4 +1,12 @@
 [toolchain]
 current = "1.80"
-components = ["rustfmt", "rustc"]
 profile = "default"
+components = [
+    "cargo",
+    "clippy",
+    "rust-docs",
+    "rust-src",
+    "rust-std",
+    "rustc",
+    "rustfmt",
+]
