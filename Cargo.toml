@@ -3,6 +3,7 @@ name = "multitool"
 version = "0.7.0"
 edition = "2021"
 repository = "https://github.com/theoremlp/multitool"
+rust-version = "1.80"
 
 [dependencies]
 clap = { version = "4.5.4", features = ["derive"] }
