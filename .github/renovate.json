@@ -1,14 +1,21 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [":semanticCommitsDisabled"],
-  "enabledManagers": ["cargo", "github-actions", "regex"],
+  "extends": [
+    ":dependencyDashboard",
+    "group:monorepos",
+    "group:recommended",
+    "replacements:all",
+    "workarounds:all"
+  ],
   "timezone": "America/New_York",
   "schedule": ["every weekday after 9am before 5pm"],
   "branchConcurrentLimit": 10,
   "labels": ["automerge"],
-  "dependencyDashboard": true,
   "cargo": {
     "fileMatch": ["^Cargo\\.(lock|toml)$"]
+  },
+  "github-actions": {
+    "ignorePaths": [".github/workflows/release.yml"]
   },
   "regexManagers": [
     {
