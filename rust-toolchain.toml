@@ -1,0 +1,3 @@
+[toolchain]
+# pin to get minimum required stable version
+channel = "1.80"
