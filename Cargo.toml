@@ -5,13 +5,13 @@ edition = "2021"
 repository = "https://github.com/theoremlp/multitool"
 
 [dependencies]
+clap = { version = "4.5.4", features = ["derive"] }
+regex = "1.10.4"
 reqwest = { version = "0.12.4", default-features = false, features = [
     "blocking",
     "rustls-tls",
     "rustls-tls-native-roots",
 ] }
-clap = { version = "4.5.4", features = ["derive"] }
-regex = "1.10.4"
 serde = { version = "1.0.200", features = ["derive"] }
 serde_json = "1.0.116"
 sha256 = "1.5.0"
@@ -24,9 +24,9 @@ lto = "thin"
 # Config for 'cargo dist'
 [workspace.metadata.dist]
 # The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.13.1"
+cargo-dist-version = "0.19.1"
 # CI backends to support
-ci = ["github"]
+ci = "github"
 # The installers to generate for each app
 installers = []
 # Target platforms to build apps for (Rust target-triple syntax)
