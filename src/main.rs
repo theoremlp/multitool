@@ -37,7 +37,11 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Updates GitHub release artifacts in the specified lockfile
-    Update,
+    Update {
+        /// The tool to update, if unset, all tools are updated.
+        #[clap(long)]
+        tool: Option<String>,
+    },
 }
 
 trait Common {
@@ -179,7 +183,7 @@ fn update_github_release(
     })
 }
 
-fn update_lockfile(path: &std::path::Path) {
+fn update_lockfile(path: &std::path::Path, tool_to_update: &Option<String>) {
     let contents = fs::read_to_string(path).expect("Unable to load lockfile");
 
     let lockfile: Lockfile =
@@ -201,6 +205,13 @@ fn update_lockfile(path: &std::path::Path) {
         .tools
         .into_iter()
         .map(|(tool, binary)| {
+            if let Some(t) = tool_to_update {
+                if !t.eq_ignore_ascii_case(&tool) {
+                    // Return the tool definition unchanged if this is not being updated.
+                    return (tool, binary);
+                }
+            }
+
             let mut binaries: Vec<Binary> = binary
                 .binaries
                 .into_iter()
@@ -247,6 +258,6 @@ fn main() {
     }
 
     match &cli.command {
-        Commands::Update => update_lockfile(lockfile),
+        Commands::Update { tool } => update_lockfile(lockfile, tool),
     }
 }
